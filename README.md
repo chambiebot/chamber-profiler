@@ -91,6 +91,77 @@ def train():
 | **Memory Analyzer** | Allocation tracking, leak detection, OOM risk assessment, memory breakdown |
 | **Communication Profiler** | Collective op timing (allreduce, allgather, etc.), bandwidth, straggler detection |
 | **Data Loading Profiler** | Batch load time, GPU idle time, I/O throughput, DataLoader config analysis |
+| **Distributed Profiler** | NCCL allreduce time, gradient sync overhead, communication vs compute ratio |
+| **Ray Profiler** | Ray Train actor metrics, actor-to-GPU mapping, straggler detection across workers |
+| **Cost Analyzer** | $/hour cost estimation, cheaper GPU recommendations, monthly savings projections |
+| **Timeline Generator** | Chrome trace format JSON for visualization in chrome://tracing or Perfetto UI |
+
+## Distributed Training Profiling
+
+Profile multi-node distributed training to identify communication bottlenecks:
+
+```python
+from src.profiler.distributed_profiler import DistributedProfiler
+
+profiler = DistributedProfiler()
+profiler.start()
+for step in range(num_steps):
+    loss = model(batch)
+    loss.backward()
+    profiler.record_step(step, compute_time_us, sync_time_us)
+    optimizer.step()
+result = profiler.stop()
+print(result.comm_compute_ratio, result.gradient_sync_overhead_pct)
+for rec in result.recommendations:
+    print(rec)
+```
+
+## Ray Train Profiling
+
+Profile Ray Train jobs — detect stragglers, map actors to GPUs:
+
+```python
+from src.profiler.ray_profiler import RayProfiler
+
+profiler = RayProfiler()
+profiler.start()
+# ... Ray Train job runs ...
+result = profiler.stop()
+for straggler in result.stragglers:
+    print(straggler.actor_id, straggler.slowdown_factor)
+```
+
+## GPU Cost Analysis
+
+Estimate costs and find cheaper GPU configurations:
+
+```python
+from src.analysis.cost_analyzer import CostAnalyzer
+
+analyzer = CostAnalyzer(gpu_name="a100_80gb", num_gpus=4)
+result = analyzer.analyze()
+print(result.current_estimate.total_cost_per_hour)
+for rec in result.recommendations:
+    print(rec.gpu_name, f"saves {rec.estimated_savings_pct:.0f}%")
+print(f"Potential monthly savings: ${result.potential_monthly_savings:,.0f}")
+```
+
+## Timeline Visualization
+
+Generate Chrome trace format timelines viewable in chrome://tracing or Perfetto UI:
+
+```python
+from src.profiler.timeline_generator import TimelineGenerator
+
+generator = TimelineGenerator(
+    gpu_result=gpu_result,
+    kernel_result=kernel_result,
+    comm_result=comm_result,
+    data_result=data_result,
+)
+generator.generate("timeline.json")
+# Open chrome://tracing and load timeline.json
+```
 
 ## Bottleneck Detection
 
