@@ -47,6 +47,7 @@ Documentation = "https://docs.usechamber.io/profiler"
 
 [project.scripts]
 chamber-profile = "src.cli.main:cli"
+chamber = "src.cli.main:cli"
 
 [tool.setuptools.packages.find]
 include = ["src*"]

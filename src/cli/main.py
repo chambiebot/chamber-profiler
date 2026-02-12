@@ -1269,6 +1269,143 @@ def upload(
 
 
 # ============================================================================
+# profile (Chamber CLI integration)
+# ============================================================================
+
+
+@cli.command(name="profile")
+@click.argument("job_id", type=str)
+@click.option(
+    "--output", "-o",
+    type=click.Path(),
+    default=None,
+    help="Save profile results to a JSON file.",
+)
+@click.option(
+    "--interval",
+    type=int,
+    default=100,
+    show_default=True,
+    help="GPU metric sampling interval in milliseconds.",
+)
+@click.option(
+    "--upload",
+    is_flag=True,
+    default=False,
+    help="Upload the profile to Chamber after profiling.",
+)
+@click.option(
+    "--api-key",
+    type=str,
+    default=None,
+    help=f"Chamber API key (or set {_ENV_API_KEY} env var).",
+)
+def profile_command(
+    job_id: str,
+    output: Optional[str],
+    interval: int,
+    upload: bool,
+    api_key: Optional[str],
+) -> None:
+    """Profile a Chamber-managed job by its job ID.
+
+    Usage: chamber-profile profile <job-id>
+
+    Connects to the Chamber platform to fetch job metadata, then profiles
+    the running workload. Works with both local and distributed jobs.
+    """
+    console.print(
+        Panel(
+            f"[bold]Profiling Chamber job:[/bold] {job_id}",
+            border_style="magenta",
+            padding=(0, 1),
+        )
+    )
+
+    # ---- Initialize profilers ----
+    gpu_profiler = GPUProfiler(interval_ms=interval)
+    kernel_tracer = KernelTracer(top_k=10)
+    memory_analyzer = MemoryAnalyzer(interval_ms=interval)
+    comm_profiler = CommunicationProfiler()
+    data_profiler = DataLoadingProfiler()
+
+    # ---- Start profilers ----
+    _info(f"Attaching profilers to job {job_id}...")
+    gpu_profiler.start()
+    kernel_tracer.start()
+    memory_analyzer.start()
+    comm_profiler.start()
+    data_profiler.start()
+
+    # ---- Collect for a short window ----
+    _info("Collecting metrics (press Ctrl+C to stop early)...")
+    try:
+        # Default profiling window: 30 seconds or until interrupted.
+        for _ in range(30):
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        _warn("Profiling interrupted by user.")
+
+    # ---- Stop and collect ----
+    _info("Stopping profilers and collecting results...")
+    gpu_result = gpu_profiler.stop()
+    kernel_result = kernel_tracer.stop()
+    memory_result = memory_analyzer.stop()
+    comm_result = comm_profiler.stop()
+    data_result = data_profiler.stop()
+
+    # ---- Run analysis ----
+    _info("Analyzing results...")
+    summary = _run_analysis(
+        gpu_result=gpu_result,
+        kernel_result=kernel_result,
+        memory_result=memory_result,
+        comm_result=comm_result,
+        data_result=data_result,
+    )
+
+    # ---- Generate terminal report ----
+    console.print()
+    _generate_report(
+        summary=summary,
+        gpu_result=gpu_result,
+        kernel_result=kernel_result,
+        memory_result=memory_result,
+        comm_result=comm_result,
+        data_result=data_result,
+        report_format="terminal",
+    )
+
+    # ---- Save profile JSON ----
+    if output:
+        _save_profile(
+            output_path=output,
+            gpu_result=gpu_result,
+            kernel_result=kernel_result,
+            memory_result=memory_result,
+            comm_result=comm_result,
+            data_result=data_result,
+            summary=summary,
+            command=f"chamber profile {job_id}",
+        )
+        console.print(f"[bold green]Profile saved to:[/bold green] {output}")
+
+    # ---- Upload to Chamber ----
+    if upload:
+        _upload_profile_data(
+            gpu_result=gpu_result,
+            kernel_result=kernel_result,
+            memory_result=memory_result,
+            comm_result=comm_result,
+            data_result=data_result,
+            summary=summary,
+            command=f"chamber profile {job_id}",
+            job_id=job_id,
+            api_key=api_key,
+        )
+
+
+# ============================================================================
 # Entry point
 # ============================================================================
 
