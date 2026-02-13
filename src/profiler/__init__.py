@@ -8,6 +8,9 @@ from src.profiler.data_loading_profiler import DataLoadingProfiler
 from src.profiler.distributed_profiler import DistributedProfiler
 from src.profiler.ray_profiler import RayProfiler
 from src.profiler.timeline_generator import TimelineGenerator
+from src.profiler.memory_leak_detector import MemoryLeakDetector
+from src.profiler.batch_size_optimizer import BatchSizeOptimizer
+from src.profiler.io_profiler import IOProfiler
 
 __all__ = [
     "GPUProfiler",
@@ -21,4 +24,7 @@ __all__ = [
     "DistributedProfiler",
     "RayProfiler",
     "TimelineGenerator",
+    "MemoryLeakDetector",
+    "BatchSizeOptimizer",
+    "IOProfiler",
 ]
